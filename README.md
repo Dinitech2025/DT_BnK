@@ -7,8 +7,8 @@ Application de test Next.js créée pour démontrer le déploiement sur serveur 
 - **Next.js 15** - Framework React pour la production
 - **TypeScript** - Typage statique
 - **TailwindCSS** - Framework CSS utilitaire
-- **Prisma** - ORM moderne pour la base de données
-- **PostgreSQL** - Base de données relationnelle
+- **Supabase** - Backend-as-a-Service avec PostgreSQL
+- **Supabase Storage** - Stockage de fichiers avec CDN
 - **ESLint** - Linting du code
 
 ## Installation et développement
@@ -109,38 +109,50 @@ sudo certbot --nginx -d votre-domaine.com
 - `/` - Page d'accueil
 - `/about` - À propos du projet
 - `/features` - Liste des fonctionnalités
-- `/database` - Test de la base de données Prisma
+- `/database` - Interface de gestion Supabase
 
-## Base de données
+## Base de données et stockage
 
-L'application utilise **Prisma** comme ORM avec **PostgreSQL**. 
+L'application utilise **Supabase** comme backend complet avec PostgreSQL et stockage de fichiers.
 
 ### Configuration rapide :
 
 ```bash
-# Installer PostgreSQL
-sudo apt install postgresql postgresql-contrib -y
+# Installer Supabase CLI
+curl -sSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz
+sudo mv supabase /usr/local/bin/supabase
 
-# Configurer la base de données
-sudo -u postgres createuser -s dinitech_user
-sudo -u postgres createdb dinitech_db
+# Installer Docker (requis)
+curl -fsSL https://get.docker.com | sudo sh
 
-# Créer le fichier .env avec DATABASE_URL
-# Voir DATABASE_SETUP.md pour plus de détails
+# Démarrer Supabase
+supabase start
 
-# Déployer le schéma
-npm run db:push
-
-# Ajouter des données de test
-npm run db:seed
+# Voir l'état des services
+supabase status
 ```
 
-### Modèles de données :
-- **User** - Utilisateurs avec email et nom
-- **Post** - Articles liés aux utilisateurs
-- **Contact** - Messages de contact
+### Fonctionnalités Supabase :
+- **Base de données** : PostgreSQL avec API REST automatique
+- **Stockage** : Upload et gestion de fichiers (images, vidéos, documents)
+- **Authentification** : Système d'auth intégré
+- **API temps réel** : Synchronisation en temps réel
+- **Dashboard** : Interface d'administration web
 
-Voir [DATABASE_SETUP.md](DATABASE_SETUP.md) pour la configuration complète.
+### Structure des données :
+- **users** - Utilisateurs avec email et nom
+- **posts** - Articles liés aux utilisateurs  
+- **contacts** - Messages de contact
+- **files** - Fichiers uploadés avec métadonnées
+- **post_files** - Liaison posts ↔ fichiers
+
+### Buckets de stockage :
+- **images** - Images (10MB max)
+- **videos** - Vidéos (100MB max)
+- **documents** - Documents PDF/Word (50MB max)
+- **audio** - Fichiers audio (50MB max)
+
+Voir [SUPABASE_SETUP.md](SUPABASE_SETUP.md) pour la configuration complète.
 
 ## Commandes utiles
 
@@ -151,10 +163,22 @@ npm run build   # Build de production
 npm start       # Serveur de production
 npm run lint    # Vérification du code
 
+# Supabase
+npm run supabase:start   # Démarrer Supabase
+npm run supabase:stop    # Arrêter Supabase
+npm run supabase:status  # État des services
+npm run supabase:reset   # Réinitialiser la DB
+
 # Production avec PM2
 pm2 logs dinitech    # Voir les logs
 pm2 restart dinitech # Redémarrer
 pm2 status          # Statut des processus
+
+# Supabase direct
+supabase start      # Démarrer les services
+supabase status     # État des services
+supabase logs       # Logs Supabase
+supabase db shell   # Accès PostgreSQL
 ```
 
 ## Configuration
@@ -164,6 +188,9 @@ Le projet utilise les fichiers de configuration suivants :
 - `tsconfig.json` - Configuration TypeScript
 - `tailwind.config.js` - Configuration TailwindCSS
 - `.eslintrc.json` - Configuration ESLint
+- `supabase/config.toml` - Configuration Supabase
+- `supabase/migrations/` - Migrations de base de données
+- `.env` - Variables d'environnement (Supabase URL, clés API)
 
 ## Licence
 
