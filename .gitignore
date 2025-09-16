@@ -49,3 +49,5 @@ Thumbs.db
 .pm2
 
 /generated/prisma
+
+/generated/prisma

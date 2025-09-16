@@ -1,34 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase, SupabaseStorage } from '@/lib/supabase'
+import { prisma, FileUtils } from '@/lib/prisma'
+import { FileManager } from '@/lib/fileManager'
 
 // GET /api/files - Récupérer tous les fichiers
 export async function GET() {
   try {
-    const { data: files, error } = await supabase
-      .from('files')
-      .select(`
-        *,
-        users (
-          id,
-          name,
-          email
-        )
-      `)
-      .order('created_at', { ascending: false })
+    const files = await prisma.file.findMany({
+      include: {
+        uploadedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true
+          }
+        },
+        postFiles: {
+          include: {
+            post: {
+              select: {
+                id: true,
+                title: true,
+                published: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
 
-    if (error) {
-      console.error('Erreur Supabase:', error)
-      return NextResponse.json(
-        { error: 'Erreur lors de la récupération des fichiers' },
-        { status: 500 }
-      )
-    }
+    // Enrichir les données avec les URLs formatées
+    const enrichedFiles = files.map(file => ({
+      ...file,
+      url: FileUtils.getFileUrl(file.path),
+      thumbnailUrl: file.thumbnail ? FileUtils.getFileUrl(file.thumbnail) : null,
+      formattedSize: FileUtils.formatFileSize(file.size),
+      categoryLabel: file.category.toLowerCase()
+    }))
 
-    return NextResponse.json(files)
+    return NextResponse.json(enrichedFiles)
   } catch (error) {
     console.error('Erreur lors de la récupération des fichiers:', error)
     return NextResponse.json(
-      { error: 'Erreur interne du serveur' },
+      { error: 'Erreur lors de la récupération des fichiers' },
       { status: 500 }
     )
   }
@@ -40,7 +57,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File
     const userId = formData.get('userId') as string
-    const category = formData.get('category') as string
+    const categoryOverride = formData.get('category') as string
 
     if (!file) {
       return NextResponse.json(
@@ -49,83 +66,139 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validation du type de fichier
-    const allowedTypes = {
-      image: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-      video: ['video/mp4', 'video/mpeg', 'video/quicktime'],
-      document: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
-      audio: ['audio/mpeg', 'audio/wav', 'audio/ogg']
-    }
-
-    const fileCategory = (category || 'document').toLowerCase()
-    if (allowedTypes[fileCategory as keyof typeof allowedTypes] && 
-        !allowedTypes[fileCategory as keyof typeof allowedTypes].includes(file.type)) {
+    // Déterminer la catégorie du fichier
+    const category = categoryOverride || FileUtils.getFileCategory(file.type).toLowerCase()
+    
+    // Valider le type de fichier
+    if (!FileUtils.isValidFileType(file.type)) {
       return NextResponse.json(
         { error: `Type de fichier non autorisé: ${file.type}` },
         { status: 400 }
       )
     }
 
-    // Générer un nom unique pour le fichier
-    const timestamp = Date.now()
-    const fileName = `${timestamp}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-    const bucket = `${fileCategory}s` // images, videos, documents, etc.
-    const filePath = `${fileName}`
-
-    // Upload vers Supabase Storage
-    const uploadResult = await SupabaseStorage.uploadFile({
-      bucket,
-      path: filePath,
-      file
-    })
+    // Upload du fichier avec le FileManager
+    const uploadResult = await FileManager.uploadFile(
+      file, 
+      category as 'image' | 'video' | 'audio' | 'document' | 'archive' | 'other'
+    )
 
     if (!uploadResult.success) {
       return NextResponse.json(
-        { error: `Échec de l'upload: ${uploadResult.error}` },
-        { status: 500 }
+        { error: uploadResult.error },
+        { status: 400 }
       )
     }
 
-    // Sauvegarder les métadonnées dans la base de données
-    const { data: fileRecord, error } = await supabase
-      .from('files')
-      .insert([{
+    // Générer le nom stocké
+    const storedName = FileUtils.generateFileName(file.name)
+
+    // Sauvegarder les métadonnées dans la base de données avec Prisma
+    const fileRecord = await prisma.file.create({
+      data: {
         filename: file.name,
-        stored_name: fileName,
-        mime_type: file.type,
-        file_size: file.size,
-        file_path: uploadResult.data!.publicUrl,
-        category: fileCategory,
-        user_id: userId ? parseInt(userId) : null,
-      }])
-      .select()
-      .single()
+        storedName: storedName,
+        mimeType: file.type,
+        size: BigInt(file.size),
+        path: uploadResult.filePath!,
+        thumbnail: uploadResult.thumbnailPath || null,
+        category: FileUtils.getFileCategory(file.type),
+        width: uploadResult.metadata?.width || null,
+        height: uploadResult.metadata?.height || null,
+        duration: uploadResult.metadata?.duration || null,
+        userId: userId ? parseInt(userId) : null
+      },
+      include: {
+        uploadedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true
+          }
+        }
+      }
+    })
 
-    if (error) {
-      console.error('Erreur lors de la sauvegarde des métadonnées:', error)
-      // Supprimer le fichier uploadé en cas d'erreur DB
-      await SupabaseStorage.deleteFile(bucket, filePath)
-      
-      return NextResponse.json(
-        { error: 'Erreur lors de la sauvegarde des métadonnées' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({
+    // Formater la réponse
+    const response = {
       success: true,
       file: {
         id: fileRecord.id,
         filename: fileRecord.filename,
-        url: uploadResult.data!.publicUrl,
-        size: fileRecord.file_size,
-        mimeType: fileRecord.mime_type,
-        category: fileRecord.category
+        url: FileUtils.getFileUrl(fileRecord.path),
+        thumbnailUrl: fileRecord.thumbnail ? FileUtils.getFileUrl(fileRecord.thumbnail) : null,
+        size: Number(fileRecord.size),
+        formattedSize: FileUtils.formatFileSize(fileRecord.size),
+        mimeType: fileRecord.mimeType,
+        category: fileRecord.category,
+        categoryLabel: fileRecord.category.toLowerCase(),
+        width: fileRecord.width,
+        height: fileRecord.height,
+        duration: fileRecord.duration,
+        uploadedBy: fileRecord.uploadedBy,
+        createdAt: fileRecord.createdAt
       }
-    })
+    }
+
+    return NextResponse.json(response, { status: 201 })
 
   } catch (error) {
     console.error('Erreur lors de l\'upload:', error)
+    return NextResponse.json(
+      { error: 'Erreur interne du serveur' },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE /api/files/[id] - Supprimer un fichier
+export async function DELETE(request: NextRequest) {
+  try {
+    const url = new URL(request.url)
+    const fileId = url.searchParams.get('id')
+
+    if (!fileId) {
+      return NextResponse.json(
+        { error: 'ID du fichier manquant' },
+        { status: 400 }
+      )
+    }
+
+    // Récupérer les infos du fichier
+    const file = await prisma.file.findUnique({
+      where: { id: parseInt(fileId) }
+    })
+
+    if (!file) {
+      return NextResponse.json(
+        { error: 'Fichier non trouvé' },
+        { status: 404 }
+      )
+    }
+
+    // Supprimer le fichier physique
+    const deleted = await FileManager.deleteFile(file.path)
+    
+    if (deleted) {
+      // Supprimer l'enregistrement de la base de données
+      await prisma.file.delete({
+        where: { id: parseInt(fileId) }
+      })
+
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Fichier supprimé avec succès' 
+      })
+    } else {
+      return NextResponse.json(
+        { error: 'Erreur lors de la suppression du fichier' },
+        { status: 500 }
+      )
+    }
+
+  } catch (error) {
+    console.error('Erreur lors de la suppression:', error)
     return NextResponse.json(
       { error: 'Erreur interne du serveur' },
       { status: 500 }

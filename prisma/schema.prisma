@@ -1,0 +1,186 @@
+// Schéma Prisma pour Dinitech
+// PostgreSQL natif + gestion de fichiers média
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== UTILISATEURS =====
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  avatar    String?  // URL vers l'avatar
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  posts     Post[]
+  files     File[]
+  comments  Comment[]
+  
+  @@map("users")
+}
+
+// ===== POSTS/ARTICLES =====
+model Post {
+  id        Int      @id @default(autoincrement())
+  title     String
+  content   String?
+  excerpt   String?  // Résumé court
+  published Boolean  @default(false)
+  featured  Boolean  @default(false) // Post en vedette
+  views     Int      @default(0)     // Nombre de vues
+  authorId  Int      @map("author_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  author    User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  files     PostFile[] // Fichiers attachés
+  comments  Comment[]
+  tags      PostTag[]
+  
+  @@map("posts")
+}
+
+// ===== FICHIERS MÉDIA =====
+model File {
+  id          Int      @id @default(autoincrement())
+  filename    String   // Nom original
+  storedName  String   @map("stored_name") // Nom sur le serveur
+  mimeType    String   @map("mime_type")   // Type MIME
+  size        BigInt   // Taille en bytes
+  path        String   // Chemin relatif depuis public/
+  category    FileCategory
+  
+  // Métadonnées média
+  width       Int?     // Pour images/vidéos
+  height      Int?     // Pour images/vidéos
+  duration    Int?     // Pour vidéos/audio (secondes)
+  thumbnail   String?  // Miniature générée
+  
+  // Relations
+  uploadedBy  User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId      Int?     @map("user_id")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Relations
+  postFiles   PostFile[]
+  
+  @@map("files")
+}
+
+// ===== LIAISON POSTS-FICHIERS (Many-to-Many) =====
+model PostFile {
+  id     Int  @id @default(autoincrement())
+  postId Int  @map("post_id")
+  fileId Int  @map("file_id")
+  order  Int  @default(0) // Ordre d'affichage
+  
+  // Relations
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  file   File @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  
+  @@unique([postId, fileId])
+  @@map("post_files")
+}
+
+// ===== COMMENTAIRES =====
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String
+  approved  Boolean  @default(false)
+  
+  // Relations
+  postId    Int      @map("post_id")
+  authorId  Int      @map("author_id")
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  @@map("comments")
+}
+
+// ===== TAGS =====
+model Tag {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  slug  String @unique
+  color String @default("#3B82F6") // Couleur d'affichage
+  
+  // Relations
+  posts PostTag[]
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  @@map("tags")
+}
+
+// ===== LIAISON POSTS-TAGS (Many-to-Many) =====
+model PostTag {
+  id     Int @id @default(autoincrement())
+  postId Int @map("post_id")
+  tagId  Int @map("tag_id")
+  
+  // Relations
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag    Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  @@unique([postId, tagId])
+  @@map("post_tags")
+}
+
+// ===== CONTACTS =====
+model Contact {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String
+  subject   String?  // Sujet du message
+  message   String
+  read      Boolean  @default(false) // Lu/non lu
+  replied   Boolean  @default(false) // Répondu/non répondu
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  @@map("contacts")
+}
+
+// ===== PARAMÈTRES DU SITE =====
+model Setting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+  type  SettingType @default(STRING)
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  
+  @@map("settings")
+}
+
+// ===== ENUMS =====
+enum FileCategory {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  ARCHIVE
+  OTHER
+}
+
+enum SettingType {
+  STRING
+  NUMBER
+  BOOLEAN
+  JSON
+}

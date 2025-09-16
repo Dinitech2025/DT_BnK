@@ -7,8 +7,9 @@ Application de test Next.js créée pour démontrer le déploiement sur serveur 
 - **Next.js 15** - Framework React pour la production
 - **TypeScript** - Typage statique
 - **TailwindCSS** - Framework CSS utilitaire
-- **Supabase** - Backend-as-a-Service avec PostgreSQL
-- **Supabase Storage** - Stockage de fichiers avec CDN
+- **Prisma** - ORM moderne pour la base de données
+- **PostgreSQL** - Base de données relationnelle native
+- **Sharp** - Traitement et optimisation d'images
 - **ESLint** - Linting du code
 
 ## Installation et développement
@@ -109,50 +110,67 @@ sudo certbot --nginx -d votre-domaine.com
 - `/` - Page d'accueil
 - `/about` - À propos du projet
 - `/features` - Liste des fonctionnalités
-- `/database` - Interface de gestion Supabase
+- `/database` - Interface de gestion de base de données
 
 ## Base de données et stockage
 
-L'application utilise **Supabase** comme backend complet avec PostgreSQL et stockage de fichiers.
+L'application utilise **Prisma** comme ORM avec **PostgreSQL natif** et un système de stockage de fichiers local.
 
 ### Configuration rapide :
 
 ```bash
-# Installer Supabase CLI
-curl -sSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz
-sudo mv supabase /usr/local/bin/supabase
+# Installer PostgreSQL
+sudo apt install postgresql postgresql-contrib -y
 
-# Installer Docker (requis)
-curl -fsSL https://get.docker.com | sudo sh
+# Configurer la base de données
+sudo -u postgres psql
+CREATE USER dinitech_user WITH PASSWORD 'mot_de_passe_fort';
+CREATE DATABASE dinitech_db OWNER dinitech_user;
+GRANT ALL PRIVILEGES ON DATABASE dinitech_db TO dinitech_user;
+\q
 
-# Démarrer Supabase
-supabase start
-
-# Voir l'état des services
-supabase status
+# Configurer le projet
+npm install
+npm run db:generate
+npm run db:push
+npm run db:seed
 ```
 
-### Fonctionnalités Supabase :
-- **Base de données** : PostgreSQL avec API REST automatique
-- **Stockage** : Upload et gestion de fichiers (images, vidéos, documents)
-- **Authentification** : Système d'auth intégré
-- **API temps réel** : Synchronisation en temps réel
-- **Dashboard** : Interface d'administration web
+### Fonctionnalités intégrées :
+- **Base de données** : PostgreSQL natif avec Prisma ORM
+- **Stockage** : Upload et gestion de fichiers locaux avec miniatures
+- **Traitement d'images** : Redimensionnement automatique avec Sharp
+- **API REST** : Routes Next.js avec validation complète
+- **Interface** : Dashboard d'administration intégré
 
 ### Structure des données :
-- **users** - Utilisateurs avec email et nom
-- **posts** - Articles liés aux utilisateurs  
+- **users** - Utilisateurs avec avatar et statistiques
+- **posts** - Articles avec fichiers attachés et tags
+- **files** - Fichiers avec métadonnées et miniatures
+- **comments** - Système de commentaires
+- **tags** - Tags pour catégoriser les posts
 - **contacts** - Messages de contact
-- **files** - Fichiers uploadés avec métadonnées
-- **post_files** - Liaison posts ↔ fichiers
+- **settings** - Paramètres de l'application
 
-### Buckets de stockage :
-- **images** - Images (10MB max)
-- **videos** - Vidéos (100MB max)
-- **documents** - Documents PDF/Word (50MB max)
-- **audio** - Fichiers audio (50MB max)
+### Catégories de fichiers :
+- **IMAGE** - Images avec miniatures automatiques
+- **VIDEO** - Vidéos avec métadonnées (durée, dimensions)
+- **AUDIO** - Fichiers audio avec durée
+- **DOCUMENT** - PDF, Word, texte
+- **ARCHIVE** - ZIP, RAR, etc.
+- **OTHER** - Autres types de fichiers
 
-Voir [SUPABASE_SETUP.md](SUPABASE_SETUP.md) pour la configuration complète.
+### Stockage local organisé :
+```
+public/uploads/
+├── image/
+│   ├── original/     # Images originales
+│   └── thumbnails/   # Miniatures générées
+├── video/
+├── audio/
+├── document/
+└── archive/
+```
 
 ## Commandes utiles
 
@@ -163,22 +181,23 @@ npm run build   # Build de production
 npm start       # Serveur de production
 npm run lint    # Vérification du code
 
-# Supabase
-npm run supabase:start   # Démarrer Supabase
-npm run supabase:stop    # Arrêter Supabase
-npm run supabase:status  # État des services
-npm run supabase:reset   # Réinitialiser la DB
+# Base de données Prisma
+npm run db:generate # Générer le client Prisma
+npm run db:push     # Pousser le schéma vers la DB
+npm run db:migrate  # Créer une migration
+npm run db:studio   # Interface graphique Prisma
+npm run db:seed     # Ajouter des données de test
+npm run db:reset    # Réinitialiser la DB
+npm run db:deploy   # Déployer les migrations (production)
 
 # Production avec PM2
 pm2 logs dinitech    # Voir les logs
 pm2 restart dinitech # Redémarrer
 pm2 status          # Statut des processus
 
-# Supabase direct
-supabase start      # Démarrer les services
-supabase status     # État des services
-supabase logs       # Logs Supabase
-supabase db shell   # Accès PostgreSQL
+# PostgreSQL direct
+sudo -u postgres psql dinitech_db  # Accès DB direct
+psql -h localhost -U dinitech_user dinitech_db  # Accès utilisateur
 ```
 
 ## Configuration
@@ -188,9 +207,9 @@ Le projet utilise les fichiers de configuration suivants :
 - `tsconfig.json` - Configuration TypeScript
 - `tailwind.config.js` - Configuration TailwindCSS
 - `.eslintrc.json` - Configuration ESLint
-- `supabase/config.toml` - Configuration Supabase
-- `supabase/migrations/` - Migrations de base de données
-- `.env` - Variables d'environnement (Supabase URL, clés API)
+- `prisma/schema.prisma` - Schéma de base de données Prisma
+- `prisma/migrations/` - Migrations de base de données
+- `.env` - Variables d'environnement (DATABASE_URL, secrets)
 
 ## Licence
 

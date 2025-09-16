@@ -176,7 +176,7 @@ export default function DatabasePage() {
   if (loading) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-24">
-        <div className="text-xl">Chargement des données Supabase...</div>
+        <div className="text-xl">Chargement des données...</div>
       </main>
     )
   }
@@ -186,7 +186,7 @@ export default function DatabasePage() {
       <main className="flex min-h-screen flex-col items-center justify-center p-24">
         <div className="text-red-600 text-xl">Erreur: {error}</div>
         <p className="text-gray-600 mt-4">
-          Assurez-vous que Supabase est configuré et accessible.
+          Assurez-vous que PostgreSQL est configuré et accessible.
         </p>
         <Link href="/" className="mt-4 text-blue-600 hover:text-blue-800">
           ← Retour à l&apos;accueil
@@ -202,7 +202,7 @@ export default function DatabasePage() {
           ← Retour à l&apos;accueil
         </Link>
         
-        <h1 className="text-4xl font-bold mb-8">Base de Données Supabase</h1>
+        <h1 className="text-4xl font-bold mb-8">Base de Données Prisma</h1>
         
         {/* Formulaires de création */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
