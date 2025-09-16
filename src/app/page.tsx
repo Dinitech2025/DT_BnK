@@ -16,6 +16,7 @@ export default function Home() {
         <h1 className="text-6xl font-bold text-center">
           Bienvenue sur{' '}
           <span className="text-blue-600">Dinitech</span>
+          <div className="text-sm mt-2 text-gray-500">Déploiement automatique actif 🚀</div>
         </h1>
       </div>
 
