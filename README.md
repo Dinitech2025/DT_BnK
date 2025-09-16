@@ -7,6 +7,8 @@ Application de test Next.js créée pour démontrer le déploiement sur serveur 
 - **Next.js 15** - Framework React pour la production
 - **TypeScript** - Typage statique
 - **TailwindCSS** - Framework CSS utilitaire
+- **Prisma** - ORM moderne pour la base de données
+- **PostgreSQL** - Base de données relationnelle
 - **ESLint** - Linting du code
 
 ## Installation et développement
@@ -107,6 +109,38 @@ sudo certbot --nginx -d votre-domaine.com
 - `/` - Page d'accueil
 - `/about` - À propos du projet
 - `/features` - Liste des fonctionnalités
+- `/database` - Test de la base de données Prisma
+
+## Base de données
+
+L'application utilise **Prisma** comme ORM avec **PostgreSQL**. 
+
+### Configuration rapide :
+
+```bash
+# Installer PostgreSQL
+sudo apt install postgresql postgresql-contrib -y
+
+# Configurer la base de données
+sudo -u postgres createuser -s dinitech_user
+sudo -u postgres createdb dinitech_db
+
+# Créer le fichier .env avec DATABASE_URL
+# Voir DATABASE_SETUP.md pour plus de détails
+
+# Déployer le schéma
+npm run db:push
+
+# Ajouter des données de test
+npm run db:seed
+```
+
+### Modèles de données :
+- **User** - Utilisateurs avec email et nom
+- **Post** - Articles liés aux utilisateurs
+- **Contact** - Messages de contact
+
+Voir [DATABASE_SETUP.md](DATABASE_SETUP.md) pour la configuration complète.
 
 ## Commandes utiles
 
