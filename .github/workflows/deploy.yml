@@ -1,0 +1,24 @@
+name: Deploy to Ubuntu Server
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          cd /var/www/DT_BnK
+          git pull origin main
+          npm install
+          npm run build
+          pm2 restart dinitech
+          echo "✅ Déploiement automatique terminé !"
